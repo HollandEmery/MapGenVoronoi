@@ -22,22 +22,29 @@ class Voronoi():
             self.y0 = bounding_box[2]
             self.y1 = bounding_box[3]
 
+        self.box_vert = [(self.x0, self.y0), (self.x0, self.y1), (self.x1, self.y1), (self.x1, self.y0)]
+        self.box_lines = [self.box_vert[i]+self.box_vert[i+1] if i < len(self.box_vert)-1 else self.box_vert[i]+self.box_vert[0] for i in range(len(self.box_vert))]
         # adds points to "priority queue", points should have no duplicates
         self.points = []
         for p in points:
             new_point = Point(p[0], p[1])
-            heapq.heappush(self.points, new_point)
-            if new_point.x < self.x0: self.x0 = new_point.x
-            if new_point.y < self.y0: self.y0 = new_point.y
-            if new_point.x > self.x1: self.x1 = new_point.x
-            if new_point.y > self.y1: self.y1 = new_point.y
+            if new_point.x > self.x0 and new_point.x < self.x1 and new_point.y > self.y0 and new_point.y < self.y1:
+                heapq.heappush(self.points, new_point)
+        self.points_used = []
+        for i in self.points:
+            self.points_used.append(i)
+
+            # if new_point.x < self.x0: self.x0 = new_point.x
+            # if new_point.y < self.y0: self.y0 = new_point.y
+            # if new_point.x > self.x1: self.x1 = new_point.x
+            # if new_point.y > self.y1: self.y1 = new_point.y
         
-        dx = (self.x1 - self.x0 + 1) / 5.0
-        dy = (self.y1 - self.y0 + 1) / 5.0
-        self.x0 = self.x0 - dx
-        self.x1 = self.x1 + dx
-        self.y0 = self.y0 - dy
-        self.y1 = self.y1 + dy
+        # dx = (self.x1 - self.x0 + 1) / 5.0
+        # dy = (self.y1 - self.y0 + 1) / 5.0
+        # self.x0 = self.x0 - dx
+        # self.x1 = self.x1 + dx
+        # self.y0 = self.y0 - dy
+        # self.y1 = self.y1 + dy
 
         self.process()
 
@@ -229,10 +236,26 @@ class Voronoi():
             res.append((p0.x, p0.y, p1.x, p1.y))
         return res
 
-    def display_output(self, draw):
+    def display_output(self, draw, box=False):
         line = self.output()
         for i in line:
             draw.line(i, (0,0,0))
+        if box:
+            for i in self.box_lines:
+                draw.line(i, (0,0,0))
+
+    def bind(self, draw, border=None):
+        if border is not None:
+            self.box = border
+        for i in self.output():
+            if (i[0] < self.x0 or i[0] > self.x1 or
+                i[2] < self.x0 or i[2] > self.x1 or
+                i[1] < self.y0 or i[1] > self.y1 or
+                i[3] < self.y0 or i[3] > self.y1):
+                draw.line(i, (255,0,0))
+                print(i)
+        print("\n\n\n\n")
+
 
 class Point():
     def __init__(self, x, y):
@@ -316,14 +339,28 @@ class ArcSegment():
 
 if __name__ == "__main__":
     # points = generatePoints(50, 100, 'uniform')
-    points = [(100,100), (200,200), (200,100), (100,200)]
+    # points = [(100,100), (200,200), (200,100), (100,200)]
     # points = [(100,100), (200,200), (220,100)]
-    bound = (0,300,0,300)
+    maxX = 1500
+    maxY = 900
+    points = []
+    for i in range(30):
+        x = random.randint(0,maxX)
+        y = random.randint(0,maxY)
+        while((x,y) in points):
+            x = random.randint(0,maxX)
+            y = random.randint(0,maxY)
+        points.append((x,y))
+    bound = (0,maxX,0,maxY)
+    # bound = (50,maxX-50,50,maxY-50)
     test = Voronoi(points, bounding_box=bound)
-    landscape = Image.new("RGB", (300,300), (255, 255, 255))
+    landscape = Image.new("RGB", (maxX,maxY), (255, 255, 255))
     draw = ImageDraw.Draw(landscape)
-    test.display_output(draw)
-    for i in points:
-        draw.point(i, (0,0,0))
+    test.display_output(draw, True)
+    # test.bind(draw)
+    # test.print_lines()  
+    for i in test.points_used:
+        # print(i)
+        draw.rectangle([i.x-1, i.y-1, i.x+1, i.y+1], (0,0,0))
     landscape.show()
     # test.print_lines()
