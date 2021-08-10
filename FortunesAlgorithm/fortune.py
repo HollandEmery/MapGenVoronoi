@@ -16,19 +16,25 @@ class Voronoi():
             self.x1 = 500
             self.y0 = 0
             self.y1 = 500
+            self.box_vert = [(self.x0, self.y0), (self.x0, self.y1), (self.x1, self.y1), (self.x1, self.y0)]
         else:
-            self.x0 = bounding_box[0]
-            self.x1 = bounding_box[1]
-            self.y0 = bounding_box[2]
-            self.y1 = bounding_box[3]
-
-        self.box_vert = [(self.x0, self.y0), (self.x0, self.y1), (self.x1, self.y1), (self.x1, self.y0)]
+            self.x0 = min(bounding_box, key=lambda x: x[0])[0]
+            self.x1 = max(bounding_box, key=lambda x: x[0])[0]
+            self.y0 = min(bounding_box, key=lambda x: x[1])[1]
+            self.y1 = max(bounding_box, key=lambda x: x[1])[1]
+            self.box_vert = bounding_box
+            # self.x0 = bounding_box[0]
+            # self.x1 = bounding_box[1]
+            # self.y0 = bounding_box[2]
+            # self.y1 = bounding_box[3]
+        
         self.box_lines = [self.box_vert[i]+self.box_vert[i+1] if i < len(self.box_vert)-1 else self.box_vert[i]+self.box_vert[0] for i in range(len(self.box_vert))]
         # adds points to "priority queue", points should have no duplicates
         self.points = []
         for p in points:
             new_point = Point(p[0], p[1])
-            if new_point.x > self.x0 and new_point.x < self.x1 and new_point.y > self.y0 and new_point.y < self.y1:
+            # if new_point.x > self.x0 and new_point.x < self.x1 and new_point.y > self.y0 and new_point.y < self.y1:
+            if not self.isOutside(new_point.x, new_point.y):
                 heapq.heappush(self.points, new_point)
         self.points_used = []
         for i in self.points:
@@ -165,7 +171,6 @@ class Voronoi():
         # check if bc is a "right turn" from ab
         if ((b.x - a.x)*(c.y - a.y) - (c.x - a.x)*(b.y - a.y)) > 0: return False, None, None
 
-        # Joseph O'Rourke, Computational Geometry in C (2nd ed.) p.189
         A = b.x - a.x
         B = b.y - a.y
         C = c.x - a.x
@@ -244,17 +249,66 @@ class Voronoi():
             for i in self.box_lines:
                 draw.line(i, (0,0,0))
 
-    def bind(self, draw, border=None):
-        if border is not None:
-            self.box = border
-        for i in self.output():
-            if (i[0] < self.x0 or i[0] > self.x1 or
-                i[2] < self.x0 or i[2] > self.x1 or
-                i[1] < self.y0 or i[1] > self.y1 or
-                i[3] < self.y0 or i[3] > self.y1):
-                draw.line(i, (255,0,0))
-                print(i)
-        print("\n\n\n\n")
+    def bind(self, draw):
+        out = self.output()
+        ind = []
+        for i in range(len(out))[::-1]:
+            # print(i)
+            if self.isOutside(out[i][0], out[i][1]) and self.isOutside(out[i][2], out[i][3]):
+                # draw.line(out[i], (255,0,0))
+                self.lines.remove(self.lines[i])
+                # ind.append(i)
+            elif self.isOutside(out[i][0], out[i][1]) or self.isOutside(out[i][2], out[i][3]):
+                for j in self.box_lines:
+                    x1 = out[i][0]
+                    x2 = out[i][2]
+                    y1 = out[i][1]
+                    y2 = out[i][3]
+                    x3 = j[0]
+                    y3 = j[1]
+                    x4 = j[2]
+                    y4 = j[3]
+                    d = ((x1-x2)*(y3-y4))-((y1-y2)*(x3-x4))
+                    if d==0:
+                        t = -1
+                        u = -1
+                    else:
+                        t = (((x1-x3)*(y3-y4))-((y1-y3)*(x3-x4)))/(d)
+                        u = (((x2-x1)*(y1-y3))-((y2-y1)*(x1-x3)))/(d)
+                    if t <= 1 and t >= 0 and u <= 1 and u >= 0:
+                        px1 = x1+t*(x2-x1)
+                        py1 = y1+t*(y2-y1)
+                        self.lines[i].start = Point(px1, py1) if self.isOutside(self.lines[i].start.x, self.lines[i].start.y) else self.lines[i].start
+                        self.lines[i].end = Point(px1, py1) if self.isOutside(self.lines[i].end.x, self.lines[i].end.y) else self.lines[i].end
+        # removed = False
+        # for i in self.points_used[::-1]:
+        #     if self.isOutside(i.x, i.y):
+        #         self.points_used.remove(i)
+        #         removed = True
+        # if removed:
+        #     self.points = [x for x in self.points_used]
+        #     self.process()
+
+    def isOutside(self, x1, y1):
+        count = 0
+        y2 = y
+        x2 = max(self.box_vert, key=lambda x: x[0])[0]+100
+        for j in self.box_lines:
+            x3 = j[0]
+            y3 = j[1]
+            x4 = j[2]
+            y4 = j[3]
+            d = ((x1-x2)*(y3-y4))-((y1-y2)*(x3-x4))
+            if d == 0:
+                t = -1
+                u = -1
+            else:
+                t = (((x1-x3)*(y3-y4))-((y1-y3)*(x3-x4)))/(d)
+                u = (((x2-x1)*(y1-y3))-((y2-y1)*(x1-x3)))/(d)
+            if t <= 1 and t >= 0 and u <= 1 and u >= 0:
+                count+=1
+        return count%2==0
+
 
 
 class Point():
@@ -352,12 +406,19 @@ if __name__ == "__main__":
             y = random.randint(0,maxY)
         points.append((x,y))
     bound = (0,maxX,0,maxY)
-    # bound = (50,maxX-50,50,maxY-50)
-    test = Voronoi(points, bounding_box=bound)
+    bound = (150,maxX-150,150,maxY-150)
+    box_vert = [(150, 150), (150, maxY-150), (300, maxY-500) ,(maxX-100, maxY-150), (maxX-100, 200), (maxX-200, 300)]
+    # bound = [box_vert[i]+box_vert[i+1] if i < len(box_vert)-1 else box_vert[i]+box_vert[0] for i in range(len(box_vert))]
+    test = Voronoi(points, bounding_box=box_vert)
+
     landscape = Image.new("RGB", (maxX,maxY), (255, 255, 255))
     draw = ImageDraw.Draw(landscape)
+    
+    
+    test.bind(draw)
+    # test.isOutside(200,200)
     test.display_output(draw, True)
-    # test.bind(draw)
+    # draw.line([200,200,1400,200], (255,0,0))
     # test.print_lines()  
     for i in test.points_used:
         # print(i)
