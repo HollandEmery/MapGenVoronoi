@@ -251,14 +251,20 @@ class Voronoi():
 
     def bind(self, draw):
         out = self.output()
-        ind = []
+        # print(self.box_lines)
         for i in range(len(out))[::-1]:
             # print(i)
-            if self.isOutside(out[i][0], out[i][1]) and self.isOutside(out[i][2], out[i][3]):
+            if (self.isOutside(out[i][0], out[i][1]) and self.isOutside(out[i][2], out[i][3]) and 
+                self.lineOutside(out[i][0], out[i][1], out[i][2], out[i][3])):
                 # draw.line(out[i], (255,0,0))
                 self.lines.remove(self.lines[i])
                 # ind.append(i)
+            # elif (self.isOutside(out[i][0], out[i][1]) and self.isOutside(out[i][2], out[i][3]) and 
+            #     not self.lineOutside(out[i][0], out[i][1], out[i][2], out[i][3])):
+            #     print("test")
             elif self.isOutside(out[i][0], out[i][1]) or self.isOutside(out[i][2], out[i][3]):
+                replace = []
+                new_lines = []
                 for j in self.box_lines:
                     x1 = out[i][0]
                     x2 = out[i][2]
@@ -278,9 +284,27 @@ class Voronoi():
                     if t <= 1 and t >= 0 and u <= 1 and u >= 0:
                         px1 = x1+t*(x2-x1)
                         py1 = y1+t*(y2-y1)
-                        self.lines[i].start = Point(px1, py1) if self.isOutside(self.lines[i].start.x, self.lines[i].start.y) else self.lines[i].start
-                        self.lines[i].end = Point(px1, py1) if self.isOutside(self.lines[i].end.x, self.lines[i].end.y) else self.lines[i].end
-        # removed = False
+                        replace.append((px1, py1))
+                        new_lines.append((x3, y3, px1, py1, x4, y4))
+
+                # print(replace)
+                if self.isOutside(self.lines[i].start.x, self.lines[i].start.y):
+                    x,y = max(replace, key=lambda x: math.sqrt((self.lines[i].end.x-x[0])**2+(self.lines[i].end.y-x[1])**2))
+                    self.lines[i].start = Point(x, y)
+                    for j in new_lines:
+                        ind = self.box_lines.index((j[0], j[1], j[4], j[5]))
+                        self.box_lines[ind:ind+1] = (j[0], j[1], j[2], j[3]), (j[2], j[3], j[4], j[5])
+                        # print(self.box_lines)
+                    
+                    
+                if self.isOutside(self.lines[i].end.x, self.lines[i].end.y):
+                    x,y = max(replace, key=lambda x: math.sqrt((self.lines[i].start.x-x[0])**2+(self.lines[i].start.y-x[1])**2))
+                    self.lines[i].end = Point(x, y)
+                    for j in new_lines:
+                        ind = self.box_lines.index((j[0], j[1], j[4], j[5]))
+                        self.box_lines[ind:ind+1] = (j[0], j[1], j[2], j[3]), (j[2], j[3], j[4], j[5])
+                        # print(self.box_lines)
+        # # removed = False
         # for i in self.points_used[::-1]:
         #     if self.isOutside(i.x, i.y):
         #         self.points_used.remove(i)
@@ -308,6 +332,130 @@ class Voronoi():
             if t <= 1 and t >= 0 and u <= 1 and u >= 0:
                 count+=1
         return count%2==0
+
+    def lineOutside(self, x1, y1, x2, y2):
+        count = 0
+        for j in self.box_lines:
+            x3 = j[0]
+            y3 = j[1]
+            x4 = j[2]
+            y4 = j[3]
+            d = ((x1-x2)*(y3-y4))-((y1-y2)*(x3-x4))
+            if d == 0:
+                t = -1
+                u = -1
+            else:
+                t = (((x1-x3)*(y3-y4))-((y1-y3)*(x3-x4)))/(d)
+                u = (((x2-x1)*(y1-y3))-((y2-y1)*(x1-x3)))/(d)
+            if t <= 1 and t >= 0 and u <= 1 and u >= 0:
+                count+=1
+        return count==0
+
+    def assignLines(self):
+        self.cells = {}
+        self.verts = {}
+        for i in self.points_used:
+            self.cells[(i.x, i.y)] = set([])
+            self.verts[(i.x, i.y)] = []
+        for i in self.output():
+            point = (i[0], i[1])
+            p2 = (i[2], i[3])
+            min_dist = min(self.points_used, key=lambda x: (x.x-point[0])**2+(x.y-point[1])**2)
+            min_dist = (min_dist.x-point[0])**2+(min_dist.y-point[1])**2
+            near = [x for x in self.points_used if round((x.x-point[0])**2+(x.y-point[1])**2) == round(min_dist)]
+            
+            min_dist = min(near, key=lambda x: (x.x-p2[0])**2+(x.y-p2[1])**2)
+            min_dist = (min_dist.x-p2[0])**2+(min_dist.y-p2[1])**2
+            near = [x for x in near if round((x.x-p2[0])**2+(x.y-p2[1])**2) == round(min_dist)]
+            for j in near:
+                self.cells[(j.x, j.y)].add(i)
+
+                
+        for i in self.box_lines:
+            point = (i[0], i[1])
+            p2 = (i[2], i[3])
+            min_dist = min(self.points_used, key=lambda x: (x.x-point[0])**2+(x.y-point[1])**2)
+            min_dist = (min_dist.x-point[0])**2+(min_dist.y-point[1])**2
+            near = [x for x in self.points_used if round((x.x-point[0])**2+(x.y-point[1])**2) == round(min_dist)]
+            
+            min_dist = min(near, key=lambda x: (x.x-p2[0])**2+(x.y-p2[1])**2)
+            min_dist = (min_dist.x-p2[0])**2+(min_dist.y-p2[1])**2
+            near = [x for x in near if round((x.x-p2[0])**2+(x.y-p2[1])**2) == round(min_dist)]
+            for j in near:
+                self.cells[(j.x, j.y)].add(i)
+
+
+        # print(self.cells)
+        self.orderCells()
+        # print("\n\n")
+        # print(self.cells)
+
+        for i in self.cells:
+            # print(self.cells[i])
+            toAdd = (self.cells[i][0][0], self.cells[i][0][1])
+            self.verts[i].append(toAdd)
+            for j in self.cells[i]:
+                # self.verts[i].add((j[0], j[1]))
+                self.verts[i].append((j[2], j[3]))
+
+    def orderCells(self):
+        for j in self.cells:
+            # temp = list(self.cells[j])
+            # check = len(temp)
+            # new_list = [temp[0]]
+            # temp = temp[1:]
+            # count = len(temp)
+            # while count != 0:
+            #     checkFound = False
+            #     for i in temp:
+            #         px = new_list[-1][2]
+            #         py = new_list[-1][3]
+            #         indRemove = -1
+            #         if px == i[0] and py == i[1]:
+            #             new_list.append(i)
+            #             indRemove = temp.index(i)
+            #             checkFound = True
+            #             break
+            #         elif px == i[2] and py == i[3]:
+            #             toAdd = (i[2], i[3], i[0], i[1])
+            #             new_list.append(toAdd)
+            #             indRemove = temp.index(i)
+            #             checkFound = True
+            #             break
+            #         temp.pop(indRemove)
+            #     print(checkFound)
+            #     count -=1
+            temp = list(self.cells[j])
+            # check = len(temp)
+            new_list = [temp[0]]
+            # temp = temp[1:]
+            count = len(temp)-1
+            while count != 0:
+                # checkFound = False
+                for i in temp:
+                    px = new_list[-1][2]
+                    py = new_list[-1][3]
+                    # print(px, py)
+                    # print(i)
+                    # print(px == i[0] and py == i[1], px == i[2] and py == i[3])
+                    # print('\n')
+                    if px == i[0] and py == i[1]:
+                        toAdd = (i[2], i[3], i[0], i[1])
+                        if toAdd not in new_list and i not in new_list:
+                            new_list.append(i)
+                        # checkFound = True
+                        # break
+                    elif px == i[2] and py == i[3]:
+                        toAdd = (i[2], i[3], i[0], i[1])
+                        if toAdd not in new_list and i not in new_list:
+                            new_list.append(toAdd)
+                        # checkFound = True
+                        # break
+                count -=1
+            # break
+            # print(new_list)
+            # print('\n\n\n')
+            self.cells[j] = new_list
 
 
 
@@ -398,7 +546,7 @@ if __name__ == "__main__":
     maxX = 1500
     maxY = 900
     points = []
-    for i in range(30):
+    for i in range(50):
         x = random.randint(0,maxX)
         y = random.randint(0,maxY)
         while((x,y) in points):
@@ -408,6 +556,7 @@ if __name__ == "__main__":
     bound = (0,maxX,0,maxY)
     bound = (150,maxX-150,150,maxY-150)
     box_vert = [(150, 150), (150, maxY-150), (300, maxY-500) ,(maxX-100, maxY-150), (maxX-100, 200), (maxX-200, 300)]
+    box_vert = [(150, 150), (150, maxY-150), (300, maxY-500) ,(maxX-100, maxY-150), (maxX-200, 300)]
     # bound = [box_vert[i]+box_vert[i+1] if i < len(box_vert)-1 else box_vert[i]+box_vert[0] for i in range(len(box_vert))]
     test = Voronoi(points, bounding_box=box_vert)
 
@@ -416,12 +565,16 @@ if __name__ == "__main__":
     
     
     test.bind(draw)
+    test.assignLines()
     # test.isOutside(200,200)
     test.display_output(draw, True)
-    # draw.line([200,200,1400,200], (255,0,0))
-    # test.print_lines()  
-    for i in test.points_used:
-        # print(i)
-        draw.rectangle([i.x-1, i.y-1, i.x+1, i.y+1], (0,0,0))
+    
+    
+    for i in test.verts:
+        color = (random.randint(0,255),random.randint(0,255),random.randint(0,255))
+
+        draw.polygon(list(test.verts[i]), fill=color)
+        draw.rectangle([i[0]-3, i[1]-3, i[0]+3, i[1]+3], (0,0,0))
+        
     landscape.show()
     # test.print_lines()
